@@ -47,5 +47,24 @@ public interface NewsJpaRepository extends JpaRepository<NewsEntity, Long> {
 
     @Query("select max(n.sourceName) from NewsEntity n where n.sourceId = :sourceId")
     String findAnySourceName(@Param("sourceId") String sourceId);
+    public interface NewsSourceView {
+        String getSourceId();
+        String getSourceName();
+
+        default String id() { return getSourceId(); }
+        default String name() { return getSourceName(); }
+    }
+    public interface SourceRow {
+        String getId();
+        String getName();
+    }
+
+    @org.springframework.data.jpa.repository.Query("""
+  select n.sourceId as id, max(n.sourceName) as name
+  from NewsEntity n
+  where n.sourceId is not null and n.sourceId <> ''
+  group by n.sourceId
+""")
+    java.util.List<SourceRow> distinctSourcesWithNames();
 
 }

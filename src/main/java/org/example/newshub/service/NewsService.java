@@ -230,5 +230,16 @@ public class NewsService {
         return Optional.ofNullable(repo.findAnySourceName(sourceId))
                 .filter(s -> !s.isBlank());
     }
+    public record SourceInfo(String id, String name) {}
+
+    public java.util.List<SourceInfo> activeSources() {
+        return repo.distinctSourcesWithNames().stream()
+                .map(r -> new SourceInfo(
+                        r.getId(),
+                        (r.getName() == null || r.getName().isBlank()) ? r.getId() : r.getName()
+                ))
+                .sorted(java.util.Comparator.comparing(SourceInfo::name, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
 
 }

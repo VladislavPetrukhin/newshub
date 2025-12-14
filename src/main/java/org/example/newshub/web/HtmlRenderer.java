@@ -27,9 +27,7 @@ public class HtmlRenderer {
     public String renderIndex(NewsService.Page page, String sort, String sourceId) {
         NewsService.Stats stats = newsService.stats();
 
-        Set<String> activeSourceIds = newsService.uniqueSourceIds();
-        List<String> activeSourceList = new ArrayList<>(activeSourceIds);
-        activeSourceList.sort(String::compareTo);
+        List<NewsService.SourceInfo> sources = newsService.activeSources();
 
         StringBuilder html = new StringBuilder();
 
@@ -51,6 +49,7 @@ public class HtmlRenderer {
         html.append("<div class='control-panel'>")
                 .append("<div class='control-group'>")
                 .append("<form action='/fetch' method='post' id='refresh-form' style='margin:0'>")
+                .append("<input type='hidden' name='force' value='1'>")
                 .append("<button type='submit' class='btn' id='refresh-btn'>")
                 .append(stats.lastFetchTime() == null ? "загрузить новости" : "обновить новости")
                 .append("</button>");
@@ -77,27 +76,38 @@ public class HtmlRenderer {
         // stats cards
         html.append("<div class='stats'>")
                 .append(statCard(stats.totalNews(), "всего новостей"))
+                .append(statCard(stats.totalNews(), "всего новостей"))
                 .append(statCard(stats.selectedFeeds(), "выбрано источников"))
-                .append(statCard(activeSourceIds.size(), "активных источников"))
                 .append(statCard(stats.newCount(), "новых"))
                 .append("</div>");
 
         // filters
         html.append("<div class='filters'>")
-                .append("<span class='filters-label'>сортировка:</span>")
-                .append(filterTag("/?sort=date" + (sourceId != null ? "&amp;source=" + escAttr(sourceId) : ""), "по дате", "date".equals(sort)))
-                .append(filterTag("/?sort=title" + (sourceId != null ? "&amp;source=" + escAttr(sourceId) : ""), "по названию", "title".equals(sort)))
-                .append(filterTag("/?sort=source" + (sourceId != null ? "&amp;source=" + escAttr(sourceId) : ""), "по источнику", "source".equals(sort)))
-                .append("<div class='spacer'></div>")
-                .append("<span class='filters-label'>источники:</span>")
-                .append(filterTag("/?sort=" + escAttr(sort), "все", sourceId == null || sourceId.isBlank()));
+                .append("<form action='/' method='get' class='filters-form'>")
 
-        for (String id : activeSourceList) {
-            String name = feedRegistry.findById(id).map(Feed::name).orElse(id);
-            html.append(filterTag("/?sort=" + escAttr(sort) + "&amp;source=" + escAttr(id), name, id.equals(sourceId)));
+                .append("<label class='filters-label' for='source'>источник:</label>")
+                .append("<select id='source' name='source'>")
+                .append("<option value='' ").append(sourceId == null ? "selected" : "").append(">все</option>");
+
+        for (var s : sources) {
+            html.append("<option value='").append(escapeHtml(s.id())).append("' ")
+                    .append(s.id().equals(sourceId) ? "selected" : "")
+                    .append(">")
+                    .append(escapeHtml(s.name()))
+                    .append("</option>");
         }
 
-        html.append("</div>");
+        html.append("</select>")
+
+                .append("<label class='filters-label' for='sort'>сортировка:</label>")
+                .append("<select id='sort' name='sort'>")
+                .append("<option value='date' ").append("date".equals(sort) ? "selected" : "").append(">по дате</option>")
+                .append("<option value='title' ").append("title".equals(sort) ? "selected" : "").append(">по названию</option>")
+                .append("<option value='source' ").append("source".equals(sort) ? "selected" : "").append(">по источнику</option>")
+                .append("</select>")
+                .append("<button type='submit' class='btn btn-small'>показать</button>")
+                .append("</form></div>");
+
 
         // news grid
         html.append("<div class='news-grid'>");
@@ -159,10 +169,10 @@ public class HtmlRenderer {
         Set<String> selected = feedRegistry.selectedIds();
 
         Map<FeedCategory, List<Feed>> byCat = new LinkedHashMap<>();
-        byCat.put(FeedCategory.RUSSIAN, new ArrayList<>());
-        byCat.put(FeedCategory.INTERNATIONAL, new ArrayList<>());
-        byCat.put(FeedCategory.BELARUS, new ArrayList<>());
-        byCat.put(FeedCategory.KAZAKHSTAN, new ArrayList<>());
+        byCat.put(FeedCategory.RUS, new ArrayList<>());
+        byCat.put(FeedCategory.INTL, new ArrayList<>());
+        byCat.put(FeedCategory.BY, new ArrayList<>());
+        byCat.put(FeedCategory.KZ, new ArrayList<>());
         byCat.put(FeedCategory.CUSTOM, new ArrayList<>());
 
         for (Feed f : all) {

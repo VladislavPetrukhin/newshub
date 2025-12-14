@@ -1,10 +1,10 @@
 package org.example.newshub.model;
 
 public enum FeedCategory {
-    RUSSIAN("российские"),
-    INTERNATIONAL("международные"),
-    BELARUS("белорусские"),
-    KAZAKHSTAN("казахстанские"),
+    RUS("российские"),
+    INTL("международные"),
+    BY("белорусские"),
+    KZ("казахстанские"),
     CUSTOM("свои");
 
     private final String title;
