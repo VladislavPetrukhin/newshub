@@ -27,6 +27,26 @@
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
 
+    <!-- DB + ORM -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+
+    <!-- Default dev DB (file-based, zero setup) -->
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- MySQL (for lab / production-like) -->
+    <dependency>
+      <groupId>com.mysql</groupId>
+      <artifactId>mysql-connector-j</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
     <dependency>
       <groupId>com.apptasticsoftware</groupId>
       <artifactId>rssreader</artifactId>
@@ -39,6 +59,7 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
 
   <build>
     <plugins>

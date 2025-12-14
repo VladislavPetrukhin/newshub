@@ -37,6 +37,7 @@ public class FeedRegistry {
     }
 
     public Set<String> selectedIds() {
+        // отдаём копию, чтобы никто снаружи не мутировал set
         return new LinkedHashSet<>(selected);
     }
 

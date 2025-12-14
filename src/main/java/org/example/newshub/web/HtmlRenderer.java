@@ -109,7 +109,7 @@ public class HtmlRenderer {
                     .append("</div>");
         } else {
             for (NewsItem item : page.items()) {
-                boolean isNew = !newsService.isSeen(item);
+                boolean isNew = !item.seen();
 
                 html.append("<div class='news-card").append(isNew ? " new" : "").append("'>");
                 if (isNew) html.append("<div class='new-badge'>новое</div>");

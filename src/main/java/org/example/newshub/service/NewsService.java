@@ -1,8 +1,13 @@
 package org.example.newshub.service;
 
+import org.example.newshub.db.NewsEntity;
+import org.example.newshub.db.NewsJpaRepository;
 import org.example.newshub.model.Feed;
 import org.example.newshub.model.NewsItem;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -10,26 +15,28 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-public class  NewsService {
+public class NewsService {
 
     private static final int MAX_NEWS = 500;
 
     private final FeedRegistry feeds;
     private final RssFetchService fetcher;
-    private final NewsRepositoryInMemory repo;
+    private final NewsJpaRepository repo;
 
-    public NewsService(FeedRegistry feeds, RssFetchService fetcher, NewsRepositoryInMemory repo) {
+    // кэш-таймер обновления — просто in-memory (для лабы достаточно)
+    private volatile Instant lastFetchTime;
+
+    public NewsService(FeedRegistry feeds, RssFetchService fetcher, NewsJpaRepository repo) {
         this.feeds = feeds;
         this.fetcher = fetcher;
         this.repo = repo;
     }
 
     public RefreshResult refresh(Duration cacheDuration) {
-        Instant last = repo.lastFetchTime();
         Instant now = Instant.now();
 
-        if (last != null) {
-            Duration since = Duration.between(last, now);
+        if (lastFetchTime != null) {
+            Duration since = Duration.between(lastFetchTime, now);
             if (since.compareTo(cacheDuration) < 0) {
                 long minutesLeft = Math.max(1, cacheDuration.minus(since).toMinutes());
                 return RefreshResult.waitMinutes(minutesLeft);
@@ -38,94 +45,154 @@ public class  NewsService {
 
         List<Feed> selectedFeeds = feeds.allFeedsInOrder().stream()
                 .filter(f -> feeds.selectedIds().contains(f.id()))
-                .collect(Collectors.toList());
+                .toList();
 
         RssFetchService.FetchResult r = fetcher.fetch(selectedFeeds);
-        int added = repo.merge(r.items(), MAX_NEWS).added();
-        repo.setLastFetchTime(now);
+        int added = saveFresh(r.items());
+
+        lastFetchTime = now;
 
         return RefreshResult.ok(added, r.errors());
     }
 
+    @Transactional
+    protected int saveFresh(List<NewsItem> incoming) {
+        if (incoming == null || incoming.isEmpty()) return 0;
+
+        // дедуп внутри одного батча, чтобы не стрельнуть себе в ногу
+        Set<String> batchKeys = new HashSet<>();
+        List<NewsEntity> toSave = new ArrayList<>();
+
+        for (NewsItem it : incoming) {
+            String key = DedupKey.of(it);
+            if (!batchKeys.add(key)) continue;          // дубль в батче
+            if (repo.existsByDedupKey(key)) continue;   // уже в БД
+
+            NewsEntity e = new NewsEntity();
+            e.setTitle(it.title());
+            e.setDescription(it.description());
+            e.setLink(it.link());
+            e.setGuid(it.guid());
+            e.setDedupKey(key);
+            e.setPubDateRaw(it.pubDateRaw());
+            e.setPublishedAt(it.publishedAt());
+            e.setAddedAt(it.addedAt() != null ? it.addedAt() : Instant.now());
+            e.setSourceId(it.sourceId());
+            e.setSourceName(it.sourceName());
+            e.setSourceUrl(it.sourceUrl());
+            e.setSeen(false);
+
+            toSave.add(e);
+        }
+
+        if (!toSave.isEmpty()) {
+            repo.saveAll(toSave);
+        }
+
+        trimToMax();
+
+        return toSave.size();
+    }
+
+    @Transactional
+    protected void trimToMax() {
+        long total = repo.count();
+        if (total <= MAX_NEWS) return;
+
+        int overflow = (int) Math.min(Integer.MAX_VALUE, total - MAX_NEWS);
+        // берём id самых старых и удаляем
+        List<Long> ids = repo.findOldestIds(PageRequest.of(0, overflow));
+        if (!ids.isEmpty()) {
+            repo.deleteByIds(ids);
+        }
+    }
+
     public List<NewsItem> search(String q) {
         if (q == null || q.trim().isEmpty()) return List.of();
-        String needle = q.toLowerCase(Locale.ROOT);
 
-        return repo.all().stream()
-                .filter(it ->
-                        safeLower(it.title()).contains(needle) ||
-                        safeLower(it.description()).contains(needle) ||
-                        safeLower(it.sourceName()).contains(needle)
-                )
-                .collect(Collectors.toList());
+        var p = repo.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseOrSourceNameContainingIgnoreCase(
+                q, q, q,
+                PageRequest.of(0, 200, Sort.by(Sort.Order.desc("publishedAt"), Sort.Order.desc("addedAt")))
+        );
+
+        return p.getContent().stream().map(NewsService::toDto).toList();
     }
 
     public Page list(String sort, String sourceId, int page, int pageSize) {
-        List<NewsItem> base = repo.all();
+        Sort s = switch (sort == null ? "" : sort) {
+            case "title" -> Sort.by(Sort.Order.asc("title"), Sort.Order.desc("addedAt"));
+            case "source" -> Sort.by(Sort.Order.asc("sourceName"), Sort.Order.desc("addedAt"));
+            case "date", "" -> Sort.by(Sort.Order.desc("publishedAt"), Sort.Order.desc("addedAt"));
+            default -> Sort.by(Sort.Order.desc("publishedAt"), Sort.Order.desc("addedAt"));
+        };
 
-        if (sourceId != null && !sourceId.isBlank()) {
-            base = base.stream()
-                    .filter(it -> sourceId.equals(it.sourceId()))
-                    .collect(Collectors.toList());
-        }
+        int safePage = Math.max(1, page);
+        var pageable = PageRequest.of(safePage - 1, pageSize, s);
 
-        List<NewsItem> sorted = new ArrayList<>(base);
-        switch (sort == null ? "" : sort) {
-            case "title" -> sorted.sort(Comparator.comparing(it -> safeLower(it.title())));
-            case "source" -> sorted.sort(Comparator.comparing(it -> safeLower(it.sourceName())));
-            case "date" -> {
-                // уже отсортировано
-            }
-            default -> {
-                // date by default
-            }
-        }
+        var p = (sourceId != null && !sourceId.isBlank())
+                ? repo.findBySourceId(sourceId, pageable)
+                : repo.findAll(pageable);
 
-        int totalItems = sorted.size();
-        int totalPages = (int) Math.ceil((double) totalItems / pageSize);
-        if (totalPages <= 0) totalPages = 1;
+        List<NewsItem> items = p.getContent().stream().map(NewsService::toDto).toList();
 
-        int safePage = Math.max(1, Math.min(page, totalPages));
-        int start = (safePage - 1) * pageSize;
-        int end = Math.min(start + pageSize, totalItems);
-
-        List<NewsItem> pageItems = (start < end) ? sorted.subList(start, end) : List.of();
-
-        return new Page(pageItems, safePage, totalPages, totalItems);
+        return new Page(items, safePage, Math.max(1, p.getTotalPages()), (int) p.getTotalElements());
     }
 
     public Stats stats() {
-        Map<String, Long> bySource = repo.all().stream()
-                .collect(Collectors.groupingBy(NewsItem::sourceName, Collectors.counting()));
+        // максимум 500 элементов — можно сгруппировать в памяти без боли
+        Map<String, Long> bySource = repo.findAll().stream()
+                .collect(Collectors.groupingBy(
+                        e -> Optional.ofNullable(e.getSourceName()).orElse("неизвестно"),
+                        Collectors.counting()
+                ));
 
         return new Stats(
-                repo.size(),
+                (int) repo.count(),
                 feeds.allFeedsInOrder().size(),
                 feeds.selectedIds().size(),
-                repo.newCount(),
-                repo.lastFetchTime(),
+                (int) repo.countUnseen(),
+                lastFetchTime,
                 bySource
         );
     }
 
     public Set<String> uniqueSourceIds() {
-        return repo.uniqueSourceIds();
+        return new LinkedHashSet<>(repo.distinctSourceIds());
     }
 
+    @Transactional
     public void markSeen(Collection<NewsItem> items) {
-        repo.markSeen(items);
+        if (items == null || items.isEmpty()) return;
+        List<Long> ids = items.stream()
+                .map(NewsItem::id)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (!ids.isEmpty()) {
+            repo.markSeen(ids);
+        }
     }
 
-    public boolean isSeen(NewsItem it) {
-        return repo.isSeen(it);
-    }
-
+    @Transactional
     public void clearSeen() {
-        repo.clearSeen();
+        repo.markAllUnseen();
     }
 
-    private static String safeLower(String s) {
-        return (s == null ? "" : s).toLowerCase(Locale.ROOT);
+    private static NewsItem toDto(NewsEntity e) {
+        return new NewsItem(
+                e.getId(),
+                e.getTitle(),
+                e.getDescription(),
+                e.getLink(),
+                e.getPubDateRaw(),
+                e.getPublishedAt(),
+                e.getAddedAt(),
+                e.getGuid(),
+                e.getSourceId(),
+                e.getSourceName(),
+                e.getSourceUrl(),
+                e.isSeen()
+        );
     }
 
     public record Page(List<NewsItem> items, int page, int totalPages, int totalItems) {}

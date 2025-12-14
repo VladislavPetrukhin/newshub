@@ -7,6 +7,7 @@ import org.example.newshub.model.NewsItem;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -27,13 +28,22 @@ public class RssFetchService {
                 for (Item it : read) {
                     String title = it.getTitle().orElse("без названия");
                     String desc  = it.getDescription().orElse("нет описания");
-                    String link  = it.getLink().orElse("#");
+                    String link  = it.getLink().orElse("");
+                    link = link.isBlank() ? null : link;
                     String dateRaw = it.getPubDate().orElse("");
                     Instant publishedAt = DateParsing.tryParseInstant(dateRaw);
                     Instant addedAt = Instant.now();
-                    String guid = it.getGuid().orElse(UUID.randomUUID().toString());
+
+                    // guid в RSS часто есть, но если его нет — делаем детерминированный,
+                    // чтобы один и тот же пост не превращался в «новый» на каждом обновлении.
+                    String guid = it.getGuid().orElse("");
+                    if (guid.isBlank()) {
+                        String base = feed.id() + "|" + (link == null ? "" : link) + "|" + title + "|" + dateRaw;
+                        guid = UUID.nameUUIDFromBytes(base.getBytes(StandardCharsets.UTF_8)).toString();
+                    }
 
                     items.add(new NewsItem(
+                            null,
                             title,
                             desc,
                             link,
@@ -43,7 +53,8 @@ public class RssFetchService {
                             guid,
                             feed.id(),
                             feed.name(),
-                            feed.url()
+                            feed.url(),
+                            false
                     ));
                 }
             } catch (Exception ex) {

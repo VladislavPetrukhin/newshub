@@ -1,0 +1,16 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: newshub-mysql
+    environment:
+      MYSQL_DATABASE: newshub
+      MYSQL_USER: newshub
+      MYSQL_PASSWORD: newshub
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - newshub_mysql:/var/lib/mysql
+
+volumes:
+  newshub_mysql:
