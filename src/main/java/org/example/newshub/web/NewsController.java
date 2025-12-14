@@ -32,24 +32,21 @@ public class NewsController {
     ) {
         NewsService.Page p = newsService.list(sort, source, page, PAGE_SIZE);
         String html = renderer.renderIndex(p, sort, source);
-        // после рендера помечаем элементы страницы как "увиденные"
         newsService.markSeen(p.items());
         return html;
     }
 
     @PostMapping(value = "/fetch", produces = MediaType.TEXT_HTML_VALUE)
     public String fetch() {
-        NewsService.RefreshResult r = newsService.refresh(CACHE_DURATION);
+        newsService.keepOnlySelectedSources();
+        NewsService.RefreshResult r = newsService.refreshForce();
 
-        if (r instanceof NewsService.RefreshResult.Wait w) {
-            return "<script>alert('подождите " + w.minutesLeft() + " минут перед обновлением'); location.href='/';</script>";
+        if (r instanceof NewsService.RefreshResult.Ok ok && !ok.errors().isEmpty()) {
+            return "<script>alert('обновлено, но часть источников упала: "
+                    + ok.errors().size()
+                    + "'); location.href='/?sort=date';</script>";
         }
 
-        NewsService.RefreshResult.Ok ok = (NewsService.RefreshResult.Ok) r;
-        if (!ok.errors().isEmpty()) {
-            // мягко: не валим весь UI, просто предупреждаем
-            return "<script>alert('обновлено, но часть источников упала: " + ok.errors().size() + "'); location.href='/?sort=date';</script>";
-        }
         return "<script>location.href='/?sort=date'</script>";
     }
 
@@ -72,6 +69,7 @@ public class NewsController {
     @PostMapping(value = "/update-sources", produces = MediaType.TEXT_HTML_VALUE)
     public String updateSources(@RequestParam(value = "source", required = false) List<String> sources) {
         feedRegistry.updateSelected(sources);
+        newsService.keepOnlySelectedSources();
         return "<script>alert('выбор источников сохранен'); location.href='/';</script>";
     }
 

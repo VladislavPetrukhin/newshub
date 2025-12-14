@@ -23,7 +23,6 @@ public class NewsService {
     private final RssFetchService fetcher;
     private final NewsJpaRepository repo;
 
-    // кэш-таймер обновления — просто in-memory (для лабы достаточно)
     private volatile Instant lastFetchTime;
 
     public NewsService(FeedRegistry feeds, RssFetchService fetcher, NewsJpaRepository repo) {
@@ -55,18 +54,22 @@ public class NewsService {
         return RefreshResult.ok(added, r.errors());
     }
 
+    public RefreshResult refreshForce() {
+        return refresh(Duration.ZERO);
+    }
+
+
     @Transactional
     protected int saveFresh(List<NewsItem> incoming) {
         if (incoming == null || incoming.isEmpty()) return 0;
 
-        // дедуп внутри одного батча, чтобы не стрельнуть себе в ногу
         Set<String> batchKeys = new HashSet<>();
         List<NewsEntity> toSave = new ArrayList<>();
 
         for (NewsItem it : incoming) {
             String key = DedupKey.of(it);
-            if (!batchKeys.add(key)) continue;          // дубль в батче
-            if (repo.existsByDedupKey(key)) continue;   // уже в БД
+            if (!batchKeys.add(key)) continue;
+            if (repo.existsByDedupKey(key)) continue;
 
             NewsEntity e = new NewsEntity();
             e.setTitle(it.title());
@@ -100,7 +103,6 @@ public class NewsService {
         if (total <= MAX_NEWS) return;
 
         int overflow = (int) Math.min(Integer.MAX_VALUE, total - MAX_NEWS);
-        // берём id самых старых и удаляем
         List<Long> ids = repo.findOldestIds(PageRequest.of(0, overflow));
         if (!ids.isEmpty()) {
             repo.deleteByIds(ids);
@@ -139,7 +141,6 @@ public class NewsService {
     }
 
     public Stats stats() {
-        // максимум 500 элементов — можно сгруппировать в памяти без боли
         Map<String, Long> bySource = repo.findAll().stream()
                 .collect(Collectors.groupingBy(
                         e -> Optional.ofNullable(e.getSourceName()).orElse("неизвестно"),
@@ -178,6 +179,17 @@ public class NewsService {
         repo.markAllUnseen();
     }
 
+    @Transactional
+    public void keepOnlySelectedSources() {
+        Set<String> keep = feeds.selectedIds();
+        if (keep == null || keep.isEmpty()) {
+            repo.deleteAll();
+        } else {
+            repo.deleteBySourceIdNotIn(keep);
+        }
+    }
+
+
     private static NewsItem toDto(NewsEntity e) {
         return new NewsItem(
                 e.getId(),
@@ -213,4 +225,10 @@ public class NewsService {
         record Ok(int added, List<String> errors) implements RefreshResult {}
         record Wait(long minutesLeft) implements RefreshResult {}
     }
+    public Optional<String> lookupSourceName(String sourceId) {
+        if (sourceId == null || sourceId.isBlank()) return Optional.empty();
+        return Optional.ofNullable(repo.findAnySourceName(sourceId))
+                .filter(s -> !s.isBlank());
+    }
+
 }

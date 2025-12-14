@@ -14,17 +14,14 @@ final class DateParsing {
         String s = raw.trim();
         if (s.isEmpty()) return null;
 
-        // 1) RFC1123 / RFC822 (часто в RSS)
         try {
             return ZonedDateTime.parse(s, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant();
         } catch (DateTimeParseException ignored) {}
 
-        // 2) ISO-8601
         try {
             return Instant.parse(s);
         } catch (DateTimeParseException ignored) {}
 
-        // 3) Иногда прилетает без зоны: "2025-12-14 12:34:56"
         List<DateTimeFormatter> fmts = List.of(
                 DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
                 DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")

@@ -289,7 +289,9 @@ public class HtmlRenderer {
 
         html.append("<div class='stat-box'><div class='stat-title'>выбранные источники</div>");
         for (String id : feedRegistry.selectedIds()) {
-            String name = feedRegistry.findById(id).map(Feed::name).orElse(id);
+            String name = feedRegistry.findById(id)
+                    .map(Feed::name)
+                    .orElseGet(() -> newsService.lookupSourceName(id).orElse(id));
             html.append("<div class='source-item'><span>")
                     .append(escapeHtml(name))
                     .append("</span><span><strong>")

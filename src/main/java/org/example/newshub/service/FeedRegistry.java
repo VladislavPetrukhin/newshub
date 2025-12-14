@@ -19,7 +19,6 @@ public class FeedRegistry {
     public FeedRegistry() {
         initDefaults();
 
-        // дефолтные выбранные
         selected.addAll(List.of("lenta", "ria", "bbc", "rt"));
     }
 
@@ -37,7 +36,6 @@ public class FeedRegistry {
     }
 
     public Set<String> selectedIds() {
-        // отдаём копию, чтобы никто снаружи не мутировал set
         return new LinkedHashSet<>(selected);
     }
 

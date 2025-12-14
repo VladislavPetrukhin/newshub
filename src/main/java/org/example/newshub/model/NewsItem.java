@@ -17,9 +17,7 @@ public record NewsItem(
         String sourceUrl,
         boolean seen
 ) {
-    /**
-     * Стабильный ключ (на случай, если понадобится "seen"/дедуп без БД).
-     */
+
     public String key() {
         if (id != null) return "id:" + id;
         if (guid != null && !guid.isBlank()) return "guid:" + guid;

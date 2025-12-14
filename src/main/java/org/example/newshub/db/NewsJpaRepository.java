@@ -40,4 +40,12 @@ public interface NewsJpaRepository extends JpaRepository<NewsEntity, Long> {
     @Modifying
     @Query("delete from NewsEntity n where n.id in :ids")
     int deleteByIds(@Param("ids") Collection<Long> ids);
+
+    @Modifying
+    @Query("delete from NewsEntity n where n.sourceId is not null and n.sourceId not in :keep")
+    int deleteBySourceIdNotIn(@Param("keep") Collection<String> keep);
+
+    @Query("select max(n.sourceName) from NewsEntity n where n.sourceId = :sourceId")
+    String findAnySourceName(@Param("sourceId") String sourceId);
+
 }
