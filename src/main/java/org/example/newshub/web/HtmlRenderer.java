@@ -181,6 +181,7 @@ public class HtmlRenderer {
 
         StringBuilder html = new StringBuilder();
         html.append("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>выбор источников</title>")
+                .append("<link rel='icon' href='/favicon.ico' sizes='any'>")
                 .append("<style>")
                 .append("body{font-family:Arial,sans-serif;padding:25px;max-width:1200px;margin:0 auto;background:#f5f7fa;color:#333}")
                 .append("h1{color:#2c3e50}")
