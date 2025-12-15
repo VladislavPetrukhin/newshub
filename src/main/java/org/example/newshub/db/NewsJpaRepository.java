@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.List;
@@ -27,10 +28,12 @@ public interface NewsJpaRepository extends JpaRepository<NewsEntity, Long> {
     );
 
     @Modifying
+    @Transactional
     @Query("update NewsEntity n set n.seen = true where n.id in :ids")
     int markSeen(@Param("ids") Collection<Long> ids);
 
     @Modifying
+    @Transactional
     @Query("update NewsEntity n set n.seen = false")
     int markAllUnseen();
 
@@ -38,10 +41,12 @@ public interface NewsJpaRepository extends JpaRepository<NewsEntity, Long> {
     List<Long> findOldestIds(Pageable pageable);
 
     @Modifying
+    @Transactional
     @Query("delete from NewsEntity n where n.id in :ids")
     int deleteByIds(@Param("ids") Collection<Long> ids);
 
     @Modifying
+    @Transactional
     @Query("delete from NewsEntity n where n.sourceId is not null and n.sourceId not in :keep")
     int deleteBySourceIdNotIn(@Param("keep") Collection<String> keep);
 

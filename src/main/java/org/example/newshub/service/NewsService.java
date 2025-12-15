@@ -54,6 +54,7 @@ public class NewsService {
         return RefreshResult.ok(added, r.errors());
     }
 
+    @Transactional
     public RefreshResult refreshForce() {
         return refresh(Duration.ZERO);
     }
