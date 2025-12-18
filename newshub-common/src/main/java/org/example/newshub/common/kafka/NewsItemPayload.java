@@ -6,6 +6,7 @@ public record NewsItemPayload(
         String title,
         String description,
         String link,
+        String category,
         String pubDateRaw,
         Instant publishedAt,
         Instant addedAt,

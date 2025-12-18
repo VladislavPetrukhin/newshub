@@ -3,6 +3,7 @@ package org.example.newshub.db;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,7 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Collection;
 import java.util.List;
 
-public interface NewsJpaRepository extends JpaRepository<NewsEntity, Long> {
+public interface NewsJpaRepository extends JpaRepository<NewsEntity, Long>,
+        JpaSpecificationExecutor<NewsEntity> {
 
     boolean existsByDedupKey(String dedupKey);
 
@@ -71,5 +73,29 @@ public interface NewsJpaRepository extends JpaRepository<NewsEntity, Long> {
   group by n.sourceId
 """)
     java.util.List<SourceRow> distinctSourcesWithNames();
+
+    @Query("""
+    select distinct n.category
+    from NewsEntity n
+    where n.category is not null and n.category <> ''
+    order by n.category
+    """)
+        List<String> distinctCategories();
+
+    public interface CategoryRow {
+        String getCategory();
+        long getCnt();
+    }
+
+    @Query("""
+select n.category as category, count(n) as cnt
+from NewsEntity n
+where n.category is not null and n.category <> ''
+group by n.category
+having count(n) >= :min
+order by count(n) desc
+""")
+    List<CategoryRow> topCategories(@Param("min") long min, Pageable pageable);
+
 
 }

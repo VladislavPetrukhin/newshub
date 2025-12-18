@@ -12,7 +12,8 @@ import java.time.Instant;
                 @Index(name = "idx_news_published", columnList = "publishedAt"),
                 @Index(name = "idx_news_added", columnList = "addedAt"),
                 @Index(name = "idx_news_seen", columnList = "seen"),
-                @Index(name = "idx_news_dedup", columnList = "dedupKey", unique = true)
+                @Index(name = "idx_news_dedup", columnList = "dedupKey", unique = true),
+                @Index(name = "idx_news_category", columnList = "category")
         }
 )
 public class NewsEntity {
@@ -24,6 +25,9 @@ public class NewsEntity {
     @Column(length = 512)
     private String title;
 
+    @Column(length = 256)
+    private String category;
+
     @Lob
     private String description;
 
@@ -32,7 +36,7 @@ public class NewsEntity {
 
     @Column(length = 2048)
     private String guid;
-    
+
     @Column(length = 64, nullable = false, unique = true)
     private String dedupKey;
 
@@ -157,4 +161,8 @@ public class NewsEntity {
     public void setSeen(boolean seen) {
         this.seen = seen;
     }
+
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
+
 }

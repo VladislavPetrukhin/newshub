@@ -1,8 +1,0 @@
-C:\Users\Vladislav\Documents\newshub-split\newshub-ingestor\src\main\java\org\example\newshub\ingestor\kafka\NewsKafkaPublisher.java
-C:\Users\Vladislav\Documents\newshub-split\newshub-ingestor\src\main\java\org\example\newshub\ingestor\NewsHubIngestorApplication.java
-C:\Users\Vladislav\Documents\newshub-split\newshub-ingestor\src\main\java\org\example\newshub\ingestor\service\DateParsing.java
-C:\Users\Vladislav\Documents\newshub-split\newshub-ingestor\src\main\java\org\example\newshub\ingestor\service\FeedApiClient.java
-C:\Users\Vladislav\Documents\newshub-split\newshub-ingestor\src\main\java\org\example\newshub\ingestor\service\IngestorService.java
-C:\Users\Vladislav\Documents\newshub-split\newshub-ingestor\src\main\java\org\example\newshub\ingestor\service\RefreshScheduler.java
-C:\Users\Vladislav\Documents\newshub-split\newshub-ingestor\src\main\java\org\example\newshub\ingestor\service\RssFetchService.java
-C:\Users\Vladislav\Documents\newshub-split\newshub-ingestor\src\main\java\org\example\newshub\ingestor\web\InternalController.java

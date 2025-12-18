@@ -1,43 +1,62 @@
 package org.example.newshub.web;
 
 import org.example.newshub.service.FeedRegistry;
+import org.example.newshub.service.KeywordService;
 import org.example.newshub.service.NewsService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
 
-@RestController
+@Controller
 public class NewsController {
 
-    private static final int PAGE_SIZE = 10;
+    private static final int PAGE_SIZE = 99;
 
     private final FeedRegistry feedRegistry;
     private final NewsService newsService;
     private final HtmlRenderer renderer;
+    private final KeywordService keywordService;
 
-    public NewsController(FeedRegistry feedRegistry, NewsService newsService, HtmlRenderer renderer) {
+    public NewsController(FeedRegistry feedRegistry, NewsService newsService, HtmlRenderer renderer,
+                          KeywordService keywordService) {
         this.feedRegistry = feedRegistry;
         this.newsService = newsService;
         this.renderer = renderer;
+        this.keywordService = keywordService;
     }
 
     @GetMapping(value = "/", produces = MediaType.TEXT_HTML_VALUE)
+    @ResponseBody
     public String index(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "date") String sort,
-            @RequestParam(required = false) String source
+            @RequestParam(required = false) String source,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String q,
+            @RequestParam(name = "mykw", defaultValue = "0") int mykw
     ) {
-        NewsService.Page p = newsService.list(sort, source, page, PAGE_SIZE);
-        String html = renderer.renderIndex(p, sort, source);
+        source = (source == null || source.isBlank()) ? null : source;
+        category = (category == null || category.isBlank()) ? null : category;
+        q = (q == null || q.isBlank()) ? null : q;
+
+        boolean useMyKeywords = (mykw == 1);
+
+        NewsService.Page p = newsService.list(sort, source, category, q, useMyKeywords, page, PAGE_SIZE);
+        List<String> categories = newsService.distinctCategories();
+        String html = renderer.renderIndex(p, sort, source, category, q, useMyKeywords, categories);
+
         newsService.markSeen(p.items());
         return html;
     }
 
+
     @PostMapping("/fetch")
+    @ResponseBody
     public ResponseEntity<Void> fetch() {
         newsService.keepOnlySelectedSources();
         newsService.triggerRefresh();
@@ -51,17 +70,20 @@ public class NewsController {
 
 
     @GetMapping(value = "/search", produces = MediaType.TEXT_HTML_VALUE)
+    @ResponseBody
     public String search(@RequestParam String q) {
         if (q == null || q.trim().isEmpty()) return "<script>location.href='/'</script>";
         return renderer.renderSearch(q, newsService.search(q));
     }
 
     @GetMapping(value = "/stats", produces = MediaType.TEXT_HTML_VALUE)
+    @ResponseBody
     public String stats() {
         return renderer.renderStats(newsService.stats());
     }
 
     @GetMapping(value = "/select-sources", produces = MediaType.TEXT_HTML_VALUE)
+    @ResponseBody
     public String selectSources() {
         return renderer.renderSelectSources();
     }
@@ -70,10 +92,11 @@ public class NewsController {
     public String updateSources(@RequestParam(value = "source", required = false) List<String> sources) {
         feedRegistry.updateSelected(sources);
         newsService.keepOnlySelectedSources();
-        return "<script>alert('выбор источников сохранен'); location.href='/';</script>";
+        return "redirect:/";
     }
 
     @GetMapping(value = "/add-custom-feed", produces = MediaType.TEXT_HTML_VALUE)
+    @ResponseBody
     public String addCustomFeedPage() {
         return renderer.renderAddCustomFeedPage();
     }
@@ -81,13 +104,30 @@ public class NewsController {
     @PostMapping(value = "/add-custom-feed", produces = MediaType.TEXT_HTML_VALUE)
     public String addCustomFeed(@RequestParam String name, @RequestParam String url) {
         feedRegistry.addCustom(name, url);
-        return "<script>alert('источник добавлен'); location.href='/select-sources';</script>";
+        return "redirect:/select-sources";
     }
 
     @GetMapping(value = "/clear-cache", produces = MediaType.TEXT_HTML_VALUE)
     public String clearCache() {
         newsService.clearSeen();
-        return "<script>location.href='/?notify=просмотренные очищены'</script>";
+        return "redirect:/?notify";
+    }
+    @GetMapping(value="/keywords", produces = MediaType.TEXT_HTML_VALUE)
+    @ResponseBody
+    public String keywords() {
+        return renderer.renderKeywords(keywordService.list());
+    }
+
+    @PostMapping("/keywords")
+    public String addKeywords(@RequestParam String keywords) {
+        keywordService.addMany(keywords);
+        return "redirect:/keywords";
+    }
+
+    @PostMapping("/keywords/delete")
+    public String deleteKeyword(@RequestParam Long id) {
+        keywordService.delete(id);
+        return "redirect:/keywords";
     }
 
     private static String escape(String s) {

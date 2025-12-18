@@ -24,10 +24,18 @@ public class HtmlRenderer {
         this.newsService = newsService;
     }
 
-    public String renderIndex(NewsService.Page page, String sort, String sourceId) {
+    public String renderIndex(NewsService.Page page, String sort, String sourceId,
+                              String category, String q, boolean mykw,
+                              List<String> categories) {
         NewsService.Stats stats = newsService.stats();
 
-        List<NewsService.SourceInfo> sources = newsService.activeSources();
+        var sources = feedRegistry.selectedIds().stream()
+                .map(id -> feedRegistry.findById(id)
+                        .map(f -> new NewsService.SourceInfo(f.id(), f.name()))
+                        .orElseGet(() -> new NewsService.SourceInfo(id, id)))
+                .sorted(Comparator.comparing(NewsService.SourceInfo::name, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+
 
         StringBuilder html = new StringBuilder();
 
@@ -84,6 +92,26 @@ public class HtmlRenderer {
         // filters
         html.append("<div class='filters'>")
                 .append("<form action='/' method='get' class='filters-form'>")
+                .append("<label class='filters-label' for='category'>категория:</label>")
+                .append("<select id='category' name='category'>")
+                .append("<option value='' ").append(category == null ? "selected" : "").append(">все</option>");
+        for (String c : categories) {
+            html.append("<option value='").append(escAttr(c)).append("' ")
+                    .append(c.equals(category) ? "selected" : "")
+                    .append(">")
+                    .append(escapeHtml(c))
+                    .append("</option>");
+        }
+        html.append("</select>")
+
+                .append("<input type='text' name='q' placeholder='ключевые слова...' value='")
+                .append(escAttr(or(q, ""))).append("'>")
+
+                .append("<label style='display:flex;gap:8px;align-items:center'>")
+                .append("<input type='checkbox' name='mykw' value='1' ")
+                .append(mykw ? "checked" : "")
+                .append("> только по моим</label>")
+                .append("<a class='btn btn-info' href='/keywords'>мои ключевые</a>")
 
                 .append("<label class='filters-label' for='source'>источник:</label>")
                 .append("<select id='source' name='source'>")
@@ -146,7 +174,10 @@ public class HtmlRenderer {
             for (int i = 1; i <= page.totalPages(); i++) {
                 String url = "/?page=" + i +
                         (sort != null ? "&amp;sort=" + escAttr(sort) : "") +
-                        (sourceId != null ? "&amp;source=" + escAttr(sourceId) : "");
+                        (sourceId != null ? "&amp;source=" + escAttr(sourceId) : "")+ (category != null ? "&amp;category=" + escAttr(category) : "")
+                        + (q != null ? "&amp;q=" + escAttr(q) : "")
+                        + (mykw ? "&amp;mykw=1" : "");
+
                 html.append("<a href='").append(url).append("' class='page-btn")
                         .append(i == page.page() ? " active" : "")
                         .append("'>").append(i).append("</a>");
@@ -413,4 +444,45 @@ public class HtmlRenderer {
                 .replace("\"", "&quot;")
                 .replace("'", "&#39;");
     }
+    public String renderKeywords(List<org.example.newshub.db.UserKeywordEntity> kws) {
+        StringBuilder html = new StringBuilder();
+        html.append("<!doctype html><html><head><meta charset='utf-8'>")
+                .append("<meta name='viewport' content='width=device-width, initial-scale=1'>")
+                .append("<title>Ключевые слова</title>")
+                .append("<link rel='stylesheet' href='/app.css'>")
+                .append("</head><body><div class='container'>");
+
+        html.append("<h1>мои ключевые слова</h1>")
+                .append("<p class='muted'>они используются в фильтре «только по моим»</p>");
+
+        html.append("<form method='post' action='/keywords' class='form-card'>")
+                .append("<label>добавить (через запятую/с новой строки)</label>")
+                .append("<textarea name='keywords' rows='3' placeholder='linux, security, postgres'></textarea>")
+                .append("<div style='margin-top:10px;display:flex;gap:10px'>")
+                .append("<button class='btn' type='submit'>сохранить</button>")
+                .append("<a class='btn btn-info' href='/'>назад</a>")
+                .append("</div>")
+                .append("</form>");
+
+        html.append("<div class='news-grid'>");
+        for (var k : kws) {
+            html.append("<div class='news-card'>")
+                    .append("<div class='news-header'><h3 class='news-title'>")
+                    .append(escapeHtml(k.getKeyword()))
+                    .append("</h3></div>")
+                    .append("<form method='post' action='/keywords/delete'>")
+                    .append("<input type='hidden' name='id' value='").append(k.getId()).append("'>")
+                    .append("<button class='btn btn-danger' type='submit'>удалить</button>")
+                    .append("</form>")
+                    .append("</div>");
+        }
+        html.append("</div>");
+
+        html.append("</div></body></html>");
+        return html.toString();
+    }
+    public String renderIndex(NewsService.Page p, String sort, String source) {
+        return renderIndex(p, sort, source, null, null, false, java.util.List.of());
+    }
+
 }

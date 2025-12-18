@@ -4,6 +4,7 @@ import org.example.newshub.common.kafka.NewsBatchEvent;
 import org.example.newshub.common.kafka.NewsItemPayload;
 import org.example.newshub.db.NewsEntity;
 import org.example.newshub.db.NewsJpaRepository;
+import org.example.newshub.db.UserKeywordRepository;
 import org.example.newshub.model.NewsItem;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,10 +30,13 @@ public class NewsService {
     private volatile Instant lastFetchTime;
     private final Deque<String> lastErrors = new ConcurrentLinkedDeque<>();
 
-    public NewsService(FeedRegistry feeds, NewsJpaRepository repo, RefreshClient refreshClient) {
+    private final UserKeywordRepository keywordRepo;
+
+    public NewsService(FeedRegistry feeds, NewsJpaRepository repo, RefreshClient refreshClient, UserKeywordRepository keywordRepo) {
         this.feeds = feeds;
         this.repo = repo;
         this.refreshClient = refreshClient;
+        this.keywordRepo = keywordRepo;
     }
 
     public TriggerResult triggerRefresh() {
@@ -79,6 +84,7 @@ public class NewsService {
             e.setTitle(it.title());
             e.setDescription(it.description());
             e.setLink(it.link());
+            e.setCategory(it.category());
             e.setGuid(it.guid());
             e.setDedupKey(key);
             e.setPubDateRaw(it.pubDateRaw());
@@ -119,8 +125,9 @@ public class NewsService {
         return p.getContent().stream().map(NewsService::toDto).toList();
     }
 
-    public Page list(String sort, String sourceId, int page, int pageSize) {
-        Sort s = switch (sort == null ? "" : sort) {
+    public Page list(String sort, String sourceId, String category, String q, boolean myKeywords, int page, int pageSize)
+    {
+        Sort sortSpec = switch (sort == null ? "" : sort) {
             case "title" -> Sort.by(Sort.Order.asc("title"), Sort.Order.desc("addedAt"));
             case "source" -> Sort.by(Sort.Order.asc("sourceName"), Sort.Order.desc("addedAt"));
             case "date", "" -> Sort.by(Sort.Order.desc("publishedAt"), Sort.Order.desc("addedAt"));
@@ -128,16 +135,47 @@ public class NewsService {
         };
 
         int safePage = Math.max(1, page);
-        var pageable = PageRequest.of(safePage - 1, pageSize, s);
+        var pageable = PageRequest.of(safePage - 1, pageSize, sortSpec);
 
-        var p = (sourceId != null && !sourceId.isBlank())
-                ? repo.findBySourceId(sourceId, pageable)
-                : repo.findAll(pageable);
+        List<String> kws;
+        if (myKeywords) {
+            kws = keywordRepo.findAll().stream()
+                    .map(k -> k.getKeyword().toLowerCase())
+                    .toList();
+        } else {
+            kws = List.of();
+        }
 
-        List<NewsItem> items = p.getContent().stream().map(NewsService::toDto).toList();
+        var spec = org.example.newshub.db.NewsSpecs.sourceId(sourceId)
+                .and(org.example.newshub.db.NewsSpecs.category(category))
+                .and(org.example.newshub.db.NewsSpecs.textQuery(q));
 
+        var p = repo.findAll(spec, pageable);
+        var stream = p.getContent().stream();
+
+        if (myKeywords && !kws.isEmpty()) {
+            List<Pattern> patterns = kws.stream()
+                    .map(String::trim)
+                    .filter(kw -> kw.length() >= 3)
+                    .map(kw -> Pattern.compile("(?iu)(^|[^\\p{L}\\p{N}_])" + Pattern.quote(kw) + "([^\\p{L}\\p{N}_]|$)"))
+                    .toList();
+
+            stream = stream.filter(e -> {
+                String text = ((e.getTitle() == null ? "" : e.getTitle()) + " " +
+                        (e.getDescription() == null ? "" : e.getDescription()));
+                for (Pattern ptn : patterns) {
+                    if (ptn.matcher(text).find()) return true;
+                }
+                return false;
+            });
+        }
+
+
+        List<NewsItem> items = stream.map(NewsService::toDto).toList();
         return new Page(items, safePage, Math.max(1, p.getTotalPages()), (int) p.getTotalElements());
+
     }
+
 
     public Stats stats() {
         Map<String, Long> bySource = repo.findAll().stream()
@@ -193,6 +231,7 @@ public class NewsService {
                 e.getTitle(),
                 e.getDescription(),
                 e.getLink(),
+                e.getCategory(),
                 e.getPubDateRaw(),
                 e.getPublishedAt(),
                 e.getAddedAt(),
@@ -237,4 +276,13 @@ public class NewsService {
                 .sorted(Comparator.comparing(SourceInfo::name, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
+    public Page list(String sort, String source, int page, int pageSize) {
+        return list(sort, source, null, null, false, page, pageSize);
+    }
+    public List<String> distinctCategories() {
+        return repo.distinctCategories();
+    }
+
+
+
 }

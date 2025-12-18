@@ -35,9 +35,20 @@ public class RssFetchService {
                     String desc  = it.getDescription().orElse("нет описания");
                     String link  = it.getLink().orElse("");
                     link = link.isBlank() ? null : link;
+
+                    String category = null;
+                    try {
+                        var cats = it.getCategories();
+                        if (cats != null && !cats.isEmpty()) {
+                            category = cats.get(0);
+                            if (category != null && category.isBlank()) category = null;
+                        }
+                    } catch (Exception ignored) {}
+
                     String dateRaw = it.getPubDate().orElse("");
                     Instant publishedAt = DateParsing.tryParseInstant(dateRaw);
                     Instant addedAt = Instant.now();
+
 
                     String guid = it.getGuid().orElse("");
                     if (guid.isBlank()) {
@@ -49,6 +60,7 @@ public class RssFetchService {
                             title,
                             desc,
                             link,
+                            category,
                             dateRaw,
                             publishedAt,
                             addedAt,
