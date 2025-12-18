@@ -1,7 +1,16 @@
 # NewsHub
 
 **NewsHub** — веб-приложение для парсинга RSS-новостей и сохранения их в базу данных, использующее Docker.
-Приложение загружает новости из выбранных источников, сохраняет их в **MySQL** и отображает через веб-интерфейс.
+Приложение загружает новости из выбранных источников, сохраняет их в **PostgreSQL** и отображает через веб-интерфейс.
+
+---
+
+## Архитектура
+
+Проект состоит минимум из **двух сервисов**:
+
+* **newshub** — веб-приложение (UI + API), хранит новости в PostgreSQL, отдаёт страницы/эндпоинты, читает события из Kafka
+* **newshub-ingestor** — сервис загрузки RSS: по команде обновления выполняет парсинг и отправляет новости в Kafka.
 
 ---
 
@@ -11,12 +20,13 @@
 - Spring Boot
 - MySQL
 - Docker
+- Apache Kafka
 
 ---
 
 ## Как запустить проект
 
-### 1. Запуск базы данных (MySQL)
+### 1. Запуск инфраструктуры (PostgreSQL + Kafka)
 
 Убедитесь, что **Docker Desktop запущен**.
 В корне проекта выполните:
@@ -31,25 +41,18 @@ docker compose up -d
 
 #### В IntelliJ IDEA (рекомендуется)
 
-1. Откройте проект
-2. Run → Edit Configurations → Spring Boot
-3. Main class:
-   ```
-   org.example.newshub.NewsHubApplication
-   ```
-4. Active profiles:
-   ```
-   mysql
-   ```
-5. JDK: **17 или 21**
-6. Нажмите **Run**
+Выполните запуск обоих сервисов как Spring Boot.
 
 ---
 
 #### Через терминал (Windows)
 
 ```powershell
-.\mvnw spring-boot:run -Dspring-boot.run.profiles=mysql
+.\mvnw -pl newshub spring-boot:run
+```
+
+```powershell
+.\mvnw -pl newshub-ingestor spring-boot:run
 ```
 
 ---
