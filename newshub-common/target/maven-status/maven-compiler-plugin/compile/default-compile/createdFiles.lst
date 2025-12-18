@@ -1,0 +1,3 @@
+org\example\newshub\common\dto\FeedDto.class
+org\example\newshub\common\kafka\NewsBatchEvent.class
+org\example\newshub\common\kafka\NewsItemPayload.class

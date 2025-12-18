@@ -1,0 +1,16 @@
+C:\Users\Vladislav\Documents\newshub-split\newshub-api\src\main\java\org\example\newshub\db\FeedEntity.java
+C:\Users\Vladislav\Documents\newshub-split\newshub-api\src\main\java\org\example\newshub\db\FeedRepository.java
+C:\Users\Vladislav\Documents\newshub-split\newshub-api\src\main\java\org\example\newshub\db\NewsEntity.java
+C:\Users\Vladislav\Documents\newshub-split\newshub-api\src\main\java\org\example\newshub\db\NewsJpaRepository.java
+C:\Users\Vladislav\Documents\newshub-split\newshub-api\src\main\java\org\example\newshub\kafka\NewsKafkaConsumer.java
+C:\Users\Vladislav\Documents\newshub-split\newshub-api\src\main\java\org\example\newshub\model\Feed.java
+C:\Users\Vladislav\Documents\newshub-split\newshub-api\src\main\java\org\example\newshub\model\FeedCategory.java
+C:\Users\Vladislav\Documents\newshub-split\newshub-api\src\main\java\org\example\newshub\model\NewsItem.java
+C:\Users\Vladislav\Documents\newshub-split\newshub-api\src\main\java\org\example\newshub\NewsHubApplication.java
+C:\Users\Vladislav\Documents\newshub-split\newshub-api\src\main\java\org\example\newshub\service\DedupKey.java
+C:\Users\Vladislav\Documents\newshub-split\newshub-api\src\main\java\org\example\newshub\service\FeedRegistry.java
+C:\Users\Vladislav\Documents\newshub-split\newshub-api\src\main\java\org\example\newshub\service\NewsService.java
+C:\Users\Vladislav\Documents\newshub-split\newshub-api\src\main\java\org\example\newshub\service\RefreshClient.java
+C:\Users\Vladislav\Documents\newshub-split\newshub-api\src\main\java\org\example\newshub\web\ApiController.java
+C:\Users\Vladislav\Documents\newshub-split\newshub-api\src\main\java\org\example\newshub\web\HtmlRenderer.java
+C:\Users\Vladislav\Documents\newshub-split\newshub-api\src\main\java\org\example\newshub\web\NewsController.java
