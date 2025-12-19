@@ -15,6 +15,7 @@ public class UserKeywordEntity {
     @Column(nullable = false, length = 128)
     private String keyword;
 
+
     public Long getId() { return id; }
     public String getKeyword() { return keyword; }
     public void setKeyword(String keyword) { this.keyword = keyword; }
