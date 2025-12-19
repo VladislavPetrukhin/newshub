@@ -29,15 +29,22 @@
 ### 1. Запуск инфраструктуры (PostgreSQL + Kafka)
 
 Убедитесь, что **Docker Desktop запущен**.
+
 В корне проекта выполните:
 
 ```bash
-docker compose up -d
+docker compose pull
 ```
 
 ---
 
 ### 2. Запуск приложения
+
+В корне проекта выполните:
+
+```bash
+docker compose up -d
+```
 
 #### В IntelliJ IDEA (рекомендуется)
 
